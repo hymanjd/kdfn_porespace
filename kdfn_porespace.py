@@ -280,12 +280,8 @@ cut_off = 1     # use this to control density
 seed = 10  # seed of random number generator 
 
 
-
-
-# In[54]:
-
-
-for T_total in range(1, 30):
+for T_total in range(1, 20):
+    print(T_total)
     final_fractures = run_simulation()
 
     plt.figure(figsize=(6,6))
@@ -307,29 +303,80 @@ for T_total in range(1, 30):
     plt.savefig(f'/Users/jhyman/Desktop/figs/time_{T_total}.png', dpi = 100)
     plt.close()
 
+    ##
+
+    # Use actual geom shape
+    H, W = geom.shape
+    matrix = np.zeros((H, W), dtype=np.uint8)
+
+    # 1 = geom, start by copying in geom pixels
+    geom_nonzero = geom.nonzero()
+    matrix[geom_nonzero] = 1
+
+    # Thickness in pixels (Adjust apertures) 
+    fracture_thickness = 10
+
+    def draw_disk(matrix, i, j, radius):
+        """Draw 0s in a disk shape to represent the fracture line (overrides existing 1s)."""
+        for di in range(-radius, radius + 1):
+            for dj in range(-radius, radius + 1):
+                if di**2 + dj**2 <= radius**2:
+                    ii = i + di
+                    jj = j + dj
+                    if 0 <= ii < matrix.shape[0] and 0 <= jj < matrix.shape[1]:
+                        matrix[ii, jj] = 0  # override with 0
+
+    # Rasterize fractures as 0s
+    for f in final_fractures:
+        x, y, θ, h = f['x'], f['y'], f['theta'], f['h']
+        dx = h * math.cos(θ)
+        dy = h * math.sin(θ)
+        x1, y1 = x - dx, y - dy
+        x2, y2 = x + dx, y + dy
+
+        # Sample along the fracture
+        N = int(2 * h * 10)
+        for t in np.linspace(0, 1, N):
+            xt = x1 + t * (x2 - x1)
+            yt = y1 + t * (y2 - y1)
+
+            i = int(round(yt))
+            j = int(round(xt))
+
+            draw_disk(matrix, i, j, radius=fracture_thickness)
 
 
-# In[51]:
+    fig,ax = plt.subplots( figsize = (10,8)) 
+    ax.spy(matrix)
+    plt.show() 
+
+    savemat(f"dump/fracture_geom_matrix_{T_total}.mat", {"combined": matrix})
+
+    ##
+
+exit()
+
+# # In[51]:
 
 
-plt.figure(figsize=(6,6))
-for f in final_fractures:
-    x, y, θ, h = f['x'], f['y'], f['theta'], f['h']
-    dx = h * math.cos(θ)
-    dy = h * math.sin(θ)
-    x1, y1 = x - dx, y - dy
-    x2, y2 = x + dx, y + dy
-    color = 'black' if f['active'] else 'black'
-    plt.plot([x1, x2], [y1, y2], color=color, linewidth=2)
+# plt.figure(figsize=(6,6))
+# for f in final_fractures:
+#     x, y, θ, h = f['x'], f['y'], f['theta'], f['h']
+#     dx = h * math.cos(θ)
+#     dy = h * math.sin(θ)
+#     x1, y1 = x - dx, y - dy
+#     x2, y2 = x + dx, y + dy
+#     color = 'black' if f['active'] else 'black'
+#     plt.plot([x1, x2], [y1, y2], color=color, linewidth=2)
 
-plt.xlim(0, L)
-plt.ylim(0, L)
-plt.gca().set_aspect('equal', 'box')
-# plt.title(f"DFN at t = {T_total:.2f} (black=arrested, red=still active)")
-plt.yticks([])
-plt.xticks([])
-plt.savefig('random-dfn.png', dpi = 300)
-plt.show()
+# plt.xlim(0, L)
+# plt.ylim(0, L)
+# plt.gca().set_aspect('equal', 'box')
+# # plt.title(f"DFN at t = {T_total:.2f} (black=arrested, red=still active)")
+# plt.yticks([])
+# plt.xticks([])
+# plt.savefig('random-dfn.png', dpi = 300)
+# plt.show()
 
 
 # # combine the data
